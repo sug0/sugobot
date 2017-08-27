@@ -1,0 +1,6 @@
+*.pyc
+config.json
+db.gz
+bot.log
+old/
+test/

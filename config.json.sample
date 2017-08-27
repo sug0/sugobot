@@ -1,0 +1,24 @@
+{
+    "server" : {
+        "host"     : "irc.freenode.net",
+        "port"     : 6697,
+        "use_ssl"  : true,
+        "channels" : [
+            "#bots"
+        ]
+    },
+
+    "nick"   : "sugobot",
+    "name"   : "An oversimplistic IRC bot written in Python",
+    "pass"   : null,
+    "extern" : {
+        "cmd_prefix"  : ":",
+        "lfm_key"     : "your last.fm api key goes here",
+        "mash_key"    : "your mashape api key does here",
+        "msg_error"   : "no can do",
+        "admin_hosts" : [
+            "my!interesting@host.1",
+            "my!interesting@host.2"
+        ]
+    }
+}

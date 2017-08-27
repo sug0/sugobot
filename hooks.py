@@ -45,6 +45,18 @@ try:
 except KeyError:
     db['youtube'] = {}
 
+# regular expressions
+regex = [(re.compile(r), rr) for (r, rr) in [
+    (r'\*\*([^*]+)\*\*', r'%c\1%c' % ('\x02', '\x0f')), # bold
+    (r'__([^_]+)__', r'%c\1%c' % ('\x1f', '\x0f')),     # underline
+    (r'\*([^*]+)\*', r'%c\1%c' % ('\x1d', '\x0f'))      # italic
+]]
+
+def rp(s):
+    for (r, rr) in regex:
+        s = r.sub(rr, s)
+    return s
+
 # bot hooks
 def pong_hook(irc_con):
     host = irc_con.matches[3]
@@ -176,11 +188,13 @@ def lfm_np_hook(irc_con):
 
                 try:
                     date = track['date']
-                    irc_con.privmsg(target, '\x02%s\x0f last played \x02%s - %s\x0f, from the album \x02%s\x0f, on \x02%s\x0f'
-                            % (user, artist, title, album, date['#text']))
+                    msg = rp('**%s** last played **%s - %s**, from the album **%s**, on **%s**'
+                        % (user, artist, title, album, date['#text']))
+                    irc_con.privmsg(target, msg)
                 except KeyError:
-                    irc_con.privmsg(target, '\x02%s\x0f is playing \x02%s - %s\x0f, from the album \x02%s\x0f'
-                            % (user, artist, title, album))
+                    msg = rp('**%s** is playing **%s - %s**, from the album **%s**'
+                        % (user, artist, title, album))
+                    irc_con.privmsg(target, msg)
 
             del lfm
 

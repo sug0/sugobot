@@ -9,10 +9,18 @@ config_path = 'config.json'
 
 # logger
 class IRC_Log:
-    def __init__(self, path):
+    def __init__(self, path=None):
         self.path = path
+        if not self.path:
+            self.write = self.write1
+        else:
+            self.write = self.write2
 
-    def write(self, msg):
+    def write1(self, msg):
+        tm = strftime('%d/%m/%y - %H:%M:%S', gmtime())
+        map(stdout.write, ['[%s] %s\n' % (tm, part) for part in msg.split('\n')])
+
+    def write2(self, msg):
         with open(self.path, 'a') as log:
             tm = strftime('%d/%m/%y - %H:%M:%S', gmtime())
             map(log.write, ['[%s] %s\n' % (tm, part) for part in msg.split('\n')])
@@ -46,7 +54,7 @@ if __name__ == '__main__':
     try:
         log = IRC_Log(argv[1])
     except IndexError:
-        log = stdout
+        log = IRC_Log()
 
     irc = IRC_Conn(config_path, hk.exports, log)
     irc.install_hook('PRIVMSG', 'reload', reload_hook)

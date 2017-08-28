@@ -18,12 +18,14 @@ class IRC_Log:
 
     def write1(self, msg):
         tm = strftime('%d/%m/%y - %H:%M:%S', gmtime())
-        map(stdout.write, ['[%s] %s\n' % (tm, part) for part in msg.split('\n')])
+        parts = msg.split('\r\n') ; parts = parts[:len(parts) - 1]
+        map(stdout.write, ['[%s] %s\n' % (tm, part) for part in parts])
 
     def write2(self, msg):
         with open(self.path, 'a') as log:
             tm = strftime('%d/%m/%y - %H:%M:%S', gmtime())
-            map(log.write, ['[%s] %s\n' % (tm, part) for part in msg.split('\n')])
+            parts = msg.split('\r\n') ; parts = parts[:len(parts) - 1]
+            map(log.write, ['[%s] %s\n' % (tm, part) for part in parts])
             log.close()
 
 # reload all the bot hooks and config

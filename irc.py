@@ -79,7 +79,7 @@ class IRC_Conn:
         self.send_raw('JOIN ' + channel)
 
     def join_configured_channels(self):
-        map(self.join, self.__config__['server']['channels'])
+        self.join(','.join(self.__config__['server']['channels']))
 
     def quit(self, msg=None):
         if msg is not None:

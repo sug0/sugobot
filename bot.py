@@ -63,12 +63,13 @@ if __name__ == '__main__':
 
     irc.connect_to_server()
     irc.auth()
-    irc.join_configured_channels() # FIXME: this shit isn't working in some servers,
-                                   # you need to manually join the channels
 
     while True:
         try:
             irc.logger.write(irc.recv())
             irc.trigger_hooks()
         except IRC_Conn.exceptions['exit']:
+            break
+        except KeyboardInterrupt:
+            irc.quit()
             break

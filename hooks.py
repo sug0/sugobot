@@ -68,6 +68,9 @@ def nick_hook(irc_con):
 def pingout_hook(irc_con):
     irc_con.reconnect_to_server()
 
+def motd_hook(irc_con):
+    irc_con.join_configured_channels()
+
 def ch_hook(irc_con):
     target = irc_con.matches[2]
     host = irc_con.matches[0]
@@ -299,5 +302,7 @@ exports = {
     'PRIVMSG' : {'ch':ch_hook, 'q':quit_hook, 'np':lfm_np_hook,
                  'ud':ud_hook, 'rc':recon_hook, 'yt':yt_hook},
     'ERROR'   : {'error':pingout_hook},
+    '376'     : {'join':motd_hook},
+    '422'     : {'join':motd_hook},
     '433'     : {'nick':nick_hook}
 }

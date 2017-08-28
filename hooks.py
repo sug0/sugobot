@@ -35,27 +35,11 @@ try:
 except IOError:
     db = {}
 
-try:
-    db['lfm']
-except KeyError:
-    db['lfm'] = {}
-
-try:
-    db['youtube']
-except KeyError:
-    db['youtube'] = {}
-
-# regular expressions
-regex = [(re.compile(r), rr) for (r, rr) in [
-    (r'\*\*([^*]+)\*\*', r'%c\1%c' % ('\x02', '\x0f')), # bold
-    (r'__([^_]+)__', r'%c\1%c' % ('\x1f', '\x0f')),     # underline
-    (r'\*([^*]+)\*', r'%c\1%c' % ('\x1d', '\x0f'))      # italic
-]]
-
-def rp(s):
-    for (r, rr) in regex:
-        s = r.sub(rr, s)
-    return s
+create_database_services(db, [
+    'lfm',
+    'youtube',
+    'intro'
+])
 
 # bot hooks
 def pong_hook(irc_con):
@@ -296,11 +280,73 @@ def yt_hook(irc_con):
 
             del soup
 
+def help_hook(irc_con):
+    if irc_con.msg_matches[0] == irc_con.cmd('help'):
+        target = irc_con.matches[2]
+
+        if target[0] != '#':
+            host = irc_con.matches[0]
+            target = parse_nick(host)
+
+        irc_con.privmsg(target, ' '.join(exports['PRIVMSG'].keys()))
+
+def intro_hook(irc_con):
+    try:
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+        msg = db['intro'][nick]
+        chan = irc_con.matches[3].replace('\r', '')
+        irc_con.privmsg(chan, msg)
+    except KeyError:
+        pass
+
+def set_intro_hook(irc_con):
+    if irc_con.msg_matches[0] == irc_con.cmd('intro'):
+        target = irc_con.matches[2]
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+
+        if target[0] != '#':
+            target = nick
+
+        cmd = None
+
+        try:
+            cmd = irc_con.msg_matches[1]
+        except IndexError:
+            try:
+                irc_con.privmsg(target, db['intro'][nick])
+            except KeyError:
+                irc_con.privmsg(target, 'usage: ' + irc_con.cmd('intro') + ' [add|del] [msg]')
+            return
+
+        if cmd == 'add':
+            terms = irc_con.msg_matches[2:]
+
+            if len(terms) == 0:
+                irc_con.privmsg(target, 'usage: ' + irc_con.cmd('intro') + ' [add|del] [msg]')
+                return
+
+            msg = ' '.join(terms)
+            db['intro'][nick] = msg
+
+            irc_con.privmsg(target, 'intro message has been saved')
+        elif cmd == 'del':
+            del db['intro'][nick]
+            irc_con.privmsg(target, 'intro message has been deleted')
+        else:
+            irc_con.privmsg(target, 'usage: ' + irc_con.cmd('intro') + ' [add|del] [msg]')
+            return
+
+        database.write(db, db_path)
+
 # the bot will load these hooks
 exports = {
     'PING'    : {'pong':pong_hook},
-    'PRIVMSG' : {'ch':ch_hook, 'q':quit_hook, 'np':lfm_np_hook,
-                 'ud':ud_hook, 'rc':recon_hook, 'yt':yt_hook},
+    'PRIVMSG' : {'join/part':ch_hook, 'q':quit_hook, 'np':lfm_np_hook,
+                 'ud':ud_hook, 'reconnect':recon_hook, 'yt':yt_hook,
+                 'help':help_hook, 'intro':set_intro_hook},
+    'JOIN'    : {'intro':intro_hook},
     'ERROR'   : {'error':pingout_hook},
     '376'     : {'join':motd_hook},
     '422'     : {'join':motd_hook},

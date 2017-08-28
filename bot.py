@@ -3,6 +3,7 @@ import hooks as hk
 from irc import *
 from util import *
 from sys import argv, stdout
+from time import gmtime, strftime
 
 config_path = 'config.json'
 
@@ -13,7 +14,8 @@ class IRC_Log:
 
     def write(self, msg):
         with open(self.path, 'a') as log:
-            log.write(msg)
+            tm = strftime('%d/%m/%y - %H:%M:%S', gmtime())
+            map(log.write, ['[%s] %s\n' % (tm, part) for part in msg.split('\n')])
             log.close()
 
 # reload all the bot hooks and config

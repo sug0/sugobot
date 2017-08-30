@@ -52,7 +52,7 @@ def nick_hook(irc_con):
 def pingout_hook(irc_con):
     irc_con.reconnect_to_server()
 
-def motd_hook(irc_con):
+def _001_hook(irc_con):
     irc_con.join_configured_channels()
 
 def ch_hook(irc_con):
@@ -111,7 +111,6 @@ def recon_hook(irc_con):
         else:
             irc_con.quit('reconnecting to server...')
             irc_con.reconnect_to_server()
-            irc_con.join_configured_channels()
 
 def lfm_np_hook(irc_con):
     target = irc_con.matches[2]
@@ -348,7 +347,6 @@ exports = {
                  'help':help_hook, 'intro':set_intro_hook},
     'JOIN'    : {'intro':intro_hook},
     'ERROR'   : {'error':pingout_hook},
-    '376'     : {'join':motd_hook},
-    '422'     : {'join':motd_hook},
+    '001'     : {'join':_001_hook},
     '433'     : {'nick':nick_hook}
 }

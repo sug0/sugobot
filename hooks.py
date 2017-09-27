@@ -54,6 +54,9 @@ def nick_hook(irc_con):
     raise IRC_Conn.exceptions['nick_in_use']
 
 def pingout_hook(irc_con):
+    global not_joined_channels
+
+    not_joined_channels = True
     irc_con.reconnect_to_server()
 
 def on_notice_join_hook(irc_con):
@@ -117,7 +120,10 @@ def recon_hook(irc_con):
 
             irc_con.privmsg(target, irc_con.extern['msg_error'])
         else:
+            global not_joined_channels
+
             irc_con.quit('reconnecting to server...')
+            not_joined_channels = True
             irc_con.reconnect_to_server()
 
 def lfm_np_hook(irc_con):

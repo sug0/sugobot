@@ -7,8 +7,9 @@ from irc import *
 from util import *
 from urllib2 import urlopen
 from urllib2 import URLError
+from random import randint as rint
 from urllib import urlencode as ue
-from urllib import quote_plus as urlencode
+from urllib import quote as urlencode
 from BeautifulSoup import BeautifulSoup
 
 # support utf-8
@@ -41,6 +42,9 @@ create_database_services(db, [
     'intro'
 ])
 
+# joined channels?
+not_joined_channels = True
+
 # bot hooks
 def pong_hook(irc_con):
     host = irc_con.matches[3]
@@ -52,8 +56,12 @@ def nick_hook(irc_con):
 def pingout_hook(irc_con):
     irc_con.reconnect_to_server()
 
-def _001_hook(irc_con):
-    irc_con.join_configured_channels()
+def on_notice_join_hook(irc_con):
+    global not_joined_channels
+
+    if not_joined_channels:
+        not_joined_channels = False
+        irc_con.join_configured_channels()
 
 def ch_hook(irc_con):
     target = irc_con.matches[2]
@@ -172,15 +180,53 @@ def lfm_np_hook(irc_con):
                 title = track['name']
                 album = track['album']['#text']
 
+                # get tags
                 try:
-                    date = track['date']
-                    msg = rp('**%s** last played **%s - %s**, from the album **%s**, on **%s**'
-                        % (user, artist, title, album, date['#text']))
-                    irc_con.privmsg(target, msg)
-                except KeyError:
-                    msg = rp('**%s** is playing **%s - %s**, from the album **%s**'
-                        % (user, artist, title, album))
-                    irc_con.privmsg(target, msg)
+                    conn = httplib.HTTPConnection('ws.audioscrobbler.com')
+                    fmt = '/2.0/?method=track.getTopTags&artist=%s&track=%s&api_key=%s&format=json'
+                    req = fmt % (urlencode(artist), urlencode(title), irc_con.extern['lfm_key'])
+                    conn.request('GET', req)
+                    rsp = conn.getresponse()
+                except socket.gaierror:
+                    irc_con.privmsg(target, 'the last.fm API is down')
+                    return
+
+                tags = None
+
+                try:
+                    _tags = json.loads(rsp.read())
+                    _toptags = _tags.get('toptags')
+                    __tags = _toptags.get('tag') if _toptags else []
+
+                    tags = [t.get('name') for t in __tags][:5]
+                    tags =  ', '.join(tags)
+
+                    del _tags ; del _toptags ; del __tags
+                except ValueError:
+                    pass
+
+                if tags:
+                    try:
+                        date = track['date']
+                        msg = rp('**%s** last played **%s - %s**, from the album **%s**, tagged as **%s**, on **%s**'
+                            % (user, artist, title, album, tags, date['#text']))
+                        irc_con.privmsg(target, msg)
+                    except KeyError:
+                        msg = rp('**%s** is playing **%s - %s**, from the album **%s**, tagged as **%s**'
+                            % (user, artist, title, album, tags))
+                        irc_con.privmsg(target, msg)
+                else:
+                    try:
+                        date = track['date']
+                        msg = rp('**%s** last played **%s - %s**, from the album **%s**, on **%s**'
+                            % (user, artist, title, album, date['#text']))
+                        irc_con.privmsg(target, msg)
+                    except KeyError:
+                        msg = rp('**%s** is playing **%s - %s**, from the album **%s**'
+                            % (user, artist, title, album))
+                        irc_con.privmsg(target, msg)
+
+                del tags
 
             del lfm
 
@@ -339,14 +385,58 @@ def set_intro_hook(irc_con):
 
         database.write(db, db_path)
 
+def pplus_hook(irc_con):
+    if len(irc_con.msg_matches) == 1:
+        target = irc_con.matches[2]
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+        z = len(irc_con.msg_matches[0]) - 2
+
+        if target[0] != '#':
+            target = nick
+
+        if irc_con.msg_matches[0][z:] == '++':
+            nick2 = irc_con.msg_matches[0][:z]
+            irc_con.privmsg(target, '%s salutes %s!' % (nick, nick2))
+        elif irc_con.msg_matches[0][z:] == '--':
+            nick2 = irc_con.msg_matches[0][:z]
+            irc_con.privmsg(target, '%s boos on %s!' % (nick, nick2))
+
+def drink_hook(irc_con):
+    if irc_con.msg_matches[0] == irc_con.cmd('drink'):
+        target = irc_con.matches[2]
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+
+        if target[0] != '#':
+            host = irc_con.matches[0]
+            target = parse_nick(host)
+
+        who = None
+
+        try:
+            who = irc_con.msg_matches[1]
+        except IOError:
+            irc_con.privmsg(target, 'usage: ' + irc_con.cmd('drink') + ' [who]')
+            return
+
+        drinks = database.load('recipes.gz')
+        d = drinks[rint(0, len(drinks))]
+
+        irc_con.privmsg(target, '%s offers %s: %s: %s | %s' % (nick, who, d[0], d[1], d[2]))
+
+        del drinks
+        del d
+
 # the bot will load these hooks
 exports = {
     'PING'    : {'pong':pong_hook},
     'PRIVMSG' : {'join/part':ch_hook, 'q':quit_hook, 'np':lfm_np_hook,
                  'ud':ud_hook, 'reconnect':recon_hook, 'yt':yt_hook,
-                 'help':help_hook, 'intro':set_intro_hook},
+                 'help':help_hook, 'intro':set_intro_hook, '++/--':pplus_hook,
+                 'drink':drink_hook},
     'JOIN'    : {'intro':intro_hook},
     'ERROR'   : {'error':pingout_hook},
-    '001'     : {'join':_001_hook},
+    'NOTICE'  : {'join':on_notice_join_hook},
     '433'     : {'nick':nick_hook}
 }

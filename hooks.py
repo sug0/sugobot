@@ -186,53 +186,15 @@ def lfm_np_hook(irc_con):
                 title = track['name']
                 album = track['album']['#text']
 
-                # get tags
                 try:
-                    conn = httplib.HTTPConnection('ws.audioscrobbler.com')
-                    fmt = '/2.0/?method=track.getTopTags&artist=%s&track=%s&api_key=%s&format=json'
-                    req = fmt % (urlencode(artist), urlencode(title), irc_con.extern['lfm_key'])
-                    conn.request('GET', req)
-                    rsp = conn.getresponse()
-                except socket.gaierror:
-                    irc_con.privmsg(target, 'the last.fm API is down')
-                    return
-
-                tags = None
-
-                try:
-                    _tags = json.loads(rsp.read())
-                    _toptags = _tags.get('toptags')
-                    __tags = _toptags.get('tag') if _toptags else []
-
-                    tags = [t.get('name') for t in __tags][:5]
-                    tags =  ', '.join(tags)
-
-                    del _tags ; del _toptags ; del __tags
-                except ValueError:
-                    pass
-
-                if tags:
-                    try:
-                        date = track['date']
-                        msg = rp('**%s** last played **%s - %s**, from the album **%s**, tagged as **%s**, on **%s**'
-                            % (user, artist, title, album, tags, date['#text']))
-                        irc_con.privmsg(target, msg)
-                    except KeyError:
-                        msg = rp('**%s** is playing **%s - %s**, from the album **%s**, tagged as **%s**'
-                            % (user, artist, title, album, tags))
-                        irc_con.privmsg(target, msg)
-                else:
-                    try:
-                        date = track['date']
-                        msg = rp('**%s** last played **%s - %s**, from the album **%s**, on **%s**'
-                            % (user, artist, title, album, date['#text']))
-                        irc_con.privmsg(target, msg)
-                    except KeyError:
-                        msg = rp('**%s** is playing **%s - %s**, from the album **%s**'
-                            % (user, artist, title, album))
-                        irc_con.privmsg(target, msg)
-
-                del tags
+                    date = track['date']
+                    msg = rp('**%s** last played **%s - %s**, from the album **%s**, on **%s**'
+                        % (user, artist, title, album, date['#text']))
+                    irc_con.privmsg(target, msg)
+                except KeyError:
+                    msg = rp('**%s** is playing **%s - %s**, from the album **%s**'
+                        % (user, artist, title, album))
+                    irc_con.privmsg(target, msg)
 
             del lfm
 

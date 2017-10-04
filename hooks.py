@@ -39,7 +39,8 @@ except IOError:
 create_database_services(db, [
     'lfm',
     'youtube',
-    'intro'
+    'intro',
+    'tell'
 ])
 
 # joined channels?
@@ -353,6 +354,53 @@ def set_intro_hook(irc_con):
 
         database.write(db, db_path)
 
+def tell_hook(irc_con):
+    try:
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+        msgs = db['tell'][nick]
+        chan = irc_con.matches[3].replace('\r', '')
+        [irc_con.privmsg(nick, '%s told you: %s' % pair) for pair in msgs]
+
+        del db['tell'][nick]
+        database.write(db, db_path)
+    except KeyError:
+        pass
+
+def set_tell_hook(irc_con):
+    if irc_con.msg_matches[0] == irc_con.cmd('tell'):
+        target = irc_con.matches[2]
+        host = irc_con.matches[0]
+        nick = parse_nick(host)
+
+        if target[0] != '#':
+            target = nick
+
+        who = None
+
+        try:
+            who = irc_con.msg_matches[1]
+        except IndexError:
+            irc_con.privmsg(target, 'usage: ' + irc_con.cmd('tell') + ' [who] [msg]')
+            return
+
+        terms = irc_con.msg_matches[2:]
+
+        if len(terms) == 0:
+            irc_con.privmsg(target, 'usage: ' + irc_con.cmd('tell') + ' [who] [msg]')
+            return
+
+        msg = ' '.join(terms)
+
+        try:
+            db['tell'][who].append((nick, msg))
+        except KeyError:
+            db['tell'][who] = [(nick, msg)]
+
+        irc_con.privmsg(target, '%s will be notified next time he/she is online' % who)
+
+        database.write(db, db_path)
+
 def pplus_hook(irc_con):
     if len(irc_con.msg_matches) == 1:
         target = irc_con.matches[2]
@@ -402,8 +450,8 @@ exports = {
     'PRIVMSG' : {'join/part':ch_hook, 'q':quit_hook, 'np':lfm_np_hook,
                  'ud':ud_hook, 'reconnect':recon_hook, 'yt':yt_hook,
                  'help':help_hook, 'intro':set_intro_hook, '++/--':pplus_hook,
-                 'drink':drink_hook},
-    'JOIN'    : {'intro':intro_hook},
+                 'drink':drink_hook, 'tell':set_tell_hook},
+    'JOIN'    : {'intro':intro_hook, 'tell':tell_hook},
     'ERROR'   : {'error':pingout_hook},
     'NOTICE'  : {'join':on_notice_join_hook},
     '433'     : {'nick':nick_hook}

@@ -2,6 +2,7 @@ import re
 import json
 import httplib
 import database
+import sqlite3
 
 from irc import *
 from util import *
@@ -10,7 +11,6 @@ from urllib2 import URLError
 from random import randint as rint
 from urllib import urlencode as ue
 from urllib import quote as urlencode
-from BeautifulSoup import BeautifulSoup
 
 # support utf-8
 import sys
@@ -259,40 +259,49 @@ def yt_hook(irc_con):
             irc_con.privmsg(target, 'usage: ' + irc_con.cmd('yt') + ' [search string]')
             return
 
-        terms = ' '.join(_terms)
+        rsp = None
+        conn = None
 
-        if terms in db['youtube']:
-            what = db['youtube'][terms]
-            irc_con.privmsg(target, '%s | %s' % (what[0], what[1]))
-        else:
-            rsp = None
-            htmlfile = None
+        try:
+            host = 'www.googleapis.com'
+            path = '/youtube/v3/search'
+            conn = httplib.HTTPSConnection(host, 443)
+            terms = ' '.join(_terms)
 
-            try:
-                htmlfile = urlopen('https://youtube.com/results?search_query=%s'
-                    % urlencode(terms))
-            except URLError:
-                irc_con.privmsg(target, 'YouTube is down')
-                return
+            params = {
+                'key': irc_con.extern['yt_key'],
+                'part': 'id,snippet',
+                'type': 'video',
+                'maxResults': '1',
+                'order': 'viewCount',
+                'q': terms
+            }
 
-            soup = BeautifulSoup(htmlfile.read())
-            results = soup.findAll('div', {'class': 'yt-lockup-content'})
+            conn.request('GET', '%s?%s' % (path, ue(params)))
+            rsp = conn.getresponse()
+        except socket.gaierror:
+            irc_con.privmsg(target, 'couldn not perform youtube API request')
+            return
 
-            if len(results) == 0:
-                irc_con.privmsg(target, 'no results found')
-            else:
-                a = results[0].find('a')
-                title = a['title']
-                url = 'https://youtube.com%s' % a['href']
+        if not rsp:
+            irc_con.privmsg(target, 'could not perform youtube API request')
+            return
 
-                irc_con.privmsg(target, '%s | %s' % (title, url))
+        q = None
 
-                db['youtube'][terms] = (title, url)
-                database.write(db, db_path)
+        try:
+            q = json.loads(rsp.read())['items'][0]
+        except IndexError:
+            irc_con.privmsg(target, "nothing found for: %s" % terms)
+            return
 
-                del results
+        url = 'https://youtu.be/%s' % q['id']['videoId']
+        title = q['snippet']['title']
 
-            del soup
+        irc_con.privmsg(target, '%s | %s' % (title, url))
+
+        del rsp
+        del q
 
 def help_hook(irc_con):
     if irc_con.msg_matches[0] == irc_con.cmd('help'):
@@ -436,12 +445,13 @@ def drink_hook(irc_con):
             irc_con.privmsg(target, 'usage: ' + irc_con.cmd('drink') + ' [who]')
             return
 
-        drinks = database.load('recipes.gz')
-        d = drinks[rint(0, len(drinks))]
+        drinks = sqlite3.connect('recipes.db')
+        cursor = drinks.cursor()
+        d = cursor.execute('SELECT * FROM drinks ORDER BY RANDOM() LIMIT 1').fetchone()
 
         irc_con.privmsg(target, '%s offers %s: %s: %s | %s' % (nick, who, d[0], d[1], d[2]))
 
-        del drinks
+        drinks.close()
         del d
 
 # the bot will load these hooks
